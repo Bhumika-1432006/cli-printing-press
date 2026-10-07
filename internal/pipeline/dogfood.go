@@ -2660,7 +2660,6 @@ func checkDescriptionDrift(cliDir, researchDir, cliDescription string) Descripti
 	return result
 }
 
-// rootShortMatches returns true when actual is an acceptable root.Short value.
 // Two sources are valid: the research headline (existing behaviour) and the
 // rendered form of cli_description — accepted because the template prefers it
 // over the headline when the spec provides it.
@@ -2675,9 +2674,9 @@ func rootShortMatches(actual, expected, cliDescription string) bool {
 	return descriptionSurfaceMatches(actual, rendered)
 }
 
-// renderRootShortFromCLIDescription mirrors truncateWords(200)+goRawSafe from
-// the root.go template so the drift checker can compare against the exact
-// string the template would emit rather than the raw spec field.
+// Mirrors truncateWords(200)+goRawSafe from the root.go template so the drift
+// checker can compare against the exact string the template would emit rather
+// than the raw spec field.
 func renderRootShortFromCLIDescription(cliDescription string) string {
 	if cliDescription == "" {
 		return ""
