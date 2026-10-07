@@ -270,6 +270,12 @@ type openAPISpec struct {
 	// records the dimension as unscored). Surfaced by hackernews retro
 	// #350 finding F8.
 	IsInternalYAML bool
+	// CLIDescription carries the internal spec's cli_description field when
+	// the spec is loaded from the printing-press internal YAML format.
+	// checkDescriptionDrift uses it as an alternate accepted value for
+	// root.Short: when the template renders root.Short from cli_description
+	// rather than narrative.headline, the drift check must accept both.
+	CLIDescription string
 }
 
 type nestedDataEnvelopeFixture struct {
@@ -394,7 +400,11 @@ func RunDogfood(dir, specPath string, opts ...DogfoodOption) (*DogfoodReport, er
 		specPaths = []string{specPath}
 	}
 	report.ReimplementationCheck = checkReimplementationWithHostGate(dir, cfg.researchDir, specPaths, dnsNovelHostResolver)
-	if drift := checkDescriptionDrift(dir, cfg.researchDir); shouldReportDescriptionDrift(drift) {
+	var specCLIDescription string
+	if spec != nil {
+		specCLIDescription = spec.CLIDescription
+	}
+	if drift := checkDescriptionDrift(dir, cfg.researchDir, specCLIDescription); shouldReportDescriptionDrift(drift) {
 		report.DescriptionDriftCheck = &drift
 	}
 	report.SourceClientCheck = checkSourceClients(dir)
@@ -2609,7 +2619,12 @@ func hasPopulatedSyncResources(syncSource string) bool {
 
 var rootShortLiteralRe = regexp.MustCompile(`Short:\s*(` + "`[^`]*`" + `|"(?:\\.|[^"])*")`)
 
-func checkDescriptionDrift(cliDir, researchDir string) DescriptionDriftResult {
+// checkDescriptionDrift compares the descriptions in the generated CLI against
+// research.json. cliDescription is the spec's cli_description field (empty when
+// the spec is absent or not an internal YAML spec); it is accepted as a valid
+// root.Short value alongside the headline because the root.go template renders
+// Short from cli_description when the spec sets one.
+func checkDescriptionDrift(cliDir, researchDir, cliDescription string) DescriptionDriftResult {
 	if researchDir == "" {
 		return DescriptionDriftResult{Skipped: true}
 	}
@@ -2635,7 +2650,7 @@ func checkDescriptionDrift(cliDir, researchDir string) DescriptionDriftResult {
 		})
 	}
 	rootPath := filepath.Join(cliDir, "internal", "cli", "root.go")
-	if actual, ok := readRootShort(rootPath); ok && !descriptionSurfaceMatches(actual, expected) {
+	if actual, ok := readRootShort(rootPath); ok && !rootShortMatches(actual, expected, cliDescription) {
 		result.Findings = append(result.Findings, DescriptionDriftFinding{
 			Surface:  "root.Short",
 			File:     filepath.Join("internal", "cli", "root.go"),
@@ -2644,6 +2659,49 @@ func checkDescriptionDrift(cliDir, researchDir string) DescriptionDriftResult {
 		})
 	}
 	return result
+}
+
+// rootShortMatches returns true when actual is an acceptable root.Short value.
+// It accepts a match against the headline (expected) or against the rendered
+// form of cliDescription — the string the root.go template emits when the spec
+// sets cli_description (goRawSafe(truncateWords(200, cliDescription))).
+func rootShortMatches(actual, expected, cliDescription string) bool {
+	if descriptionSurfaceMatches(actual, expected) {
+		return true
+	}
+	if cliDescription == "" {
+		return false
+	}
+	rendered := renderRootShortFromCLIDescription(cliDescription)
+	return descriptionSurfaceMatches(actual, rendered)
+}
+
+// renderRootShortFromCLIDescription applies the same transformation as the
+// root.go template: truncateWords(200) then goRawSafe (backtick → apostrophe).
+// This produces the string the template would embed as root.Short when the spec
+// sets cli_description, so the drift checker can compare against it directly.
+func renderRootShortFromCLIDescription(cliDescription string) string {
+	if cliDescription == "" {
+		return ""
+	}
+	runes := []rune(cliDescription)
+	const max = 200
+	truncated := cliDescription
+	if len(runes) > max {
+		cut := runes[:max-1]
+		boundary := -1
+		for i := len(cut) - 1; i >= 0; i-- {
+			if cut[i] == ' ' || cut[i] == '\t' {
+				boundary = i
+				break
+			}
+		}
+		if boundary > 0 {
+			cut = cut[:boundary]
+		}
+		truncated = strings.TrimRight(string(cut), " \t") + "…"
+	}
+	return strings.ReplaceAll(truncated, "`", "'")
 }
 
 func readManifestDescription(path string) (string, bool) {
