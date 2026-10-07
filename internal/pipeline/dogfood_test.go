@@ -1208,6 +1208,7 @@ func TestRenderRootShortFromCLIDescription(t *testing.T) {
 		{"backtick replaced", "The `--flag` option", "The '--flag' option"},
 		{"exactly 200 runes", strings.Repeat("b", 200), strings.Repeat("b", 200)},
 		{"over 200 runes clips at word", "word " + strings.Repeat("x", 300), "word…"},
+		{"multibyte runes counted by rune not byte", "α " + strings.Repeat("β", 300), "α…"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
