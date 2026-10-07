@@ -1206,22 +1206,12 @@ func TestRenderRootShortFromCLIDescription(t *testing.T) {
 		{"empty", "", ""},
 		{"short no backtick", "Short string", "Short string"},
 		{"backtick replaced", "The `--flag` option", "The '--flag' option"},
-		{"exactly 200 runes", string([]rune("a")[:1]) + strings.Repeat("b", 199), strings.Repeat("b", 199) + "a"},
+		{"exactly 200 runes", strings.Repeat("b", 200), strings.Repeat("b", 200)},
 		{"over 200 runes clips at word", "word " + strings.Repeat("x", 300), "word…"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			got := renderRootShortFromCLIDescription(tc.input)
-			if tc.name == "exactly 200 runes" {
-				// just check length
-				assert.LessOrEqual(t, len([]rune(got)), 200)
-				return
-			}
-			if tc.name == "over 200 runes clips at word" {
-				assert.LessOrEqual(t, len([]rune(got)), 200)
-				assert.True(t, strings.HasSuffix(got, "…"))
-				return
-			}
 			assert.Equal(t, tc.want, got)
 		})
 	}

@@ -17,6 +17,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/mvanhorn/cli-printing-press/v4/internal/artifacts"
 	"github.com/mvanhorn/cli-printing-press/v4/internal/naming"
@@ -270,11 +271,9 @@ type openAPISpec struct {
 	// records the dimension as unscored). Surfaced by hackernews retro
 	// #350 finding F8.
 	IsInternalYAML bool
-	// CLIDescription carries the internal spec's cli_description field when
-	// the spec is loaded from the printing-press internal YAML format.
-	// checkDescriptionDrift uses it as an alternate accepted value for
-	// root.Short: when the template renders root.Short from cli_description
-	// rather than narrative.headline, the drift check must accept both.
+	// Populated from the spec's cli_description so checkDescriptionDrift can
+	// accept root.Short values the template renders from it, not only the
+	// headline.
 	CLIDescription string
 }
 
@@ -2662,9 +2661,9 @@ func checkDescriptionDrift(cliDir, researchDir, cliDescription string) Descripti
 }
 
 // rootShortMatches returns true when actual is an acceptable root.Short value.
-// It accepts a match against the headline (expected) or against the rendered
-// form of cliDescription — the string the root.go template emits when the spec
-// sets cli_description (goRawSafe(truncateWords(200, cliDescription))).
+// Two sources are valid: the research headline (existing behaviour) and the
+// rendered form of cli_description — accepted because the template prefers it
+// over the headline when the spec provides it.
 func rootShortMatches(actual, expected, cliDescription string) bool {
 	if descriptionSurfaceMatches(actual, expected) {
 		return true
@@ -2676,10 +2675,9 @@ func rootShortMatches(actual, expected, cliDescription string) bool {
 	return descriptionSurfaceMatches(actual, rendered)
 }
 
-// renderRootShortFromCLIDescription applies the same transformation as the
-// root.go template: truncateWords(200) then goRawSafe (backtick → apostrophe).
-// This produces the string the template would embed as root.Short when the spec
-// sets cli_description, so the drift checker can compare against it directly.
+// renderRootShortFromCLIDescription mirrors truncateWords(200)+goRawSafe from
+// the root.go template so the drift checker can compare against the exact
+// string the template would emit rather than the raw spec field.
 func renderRootShortFromCLIDescription(cliDescription string) string {
 	if cliDescription == "" {
 		return ""
@@ -2691,7 +2689,7 @@ func renderRootShortFromCLIDescription(cliDescription string) string {
 		cut := runes[:max-1]
 		boundary := -1
 		for i := len(cut) - 1; i >= 0; i-- {
-			if cut[i] == ' ' || cut[i] == '\t' {
+			if unicode.IsSpace(cut[i]) {
 				boundary = i
 				break
 			}
@@ -2699,7 +2697,7 @@ func renderRootShortFromCLIDescription(cliDescription string) string {
 		if boundary > 0 {
 			cut = cut[:boundary]
 		}
-		truncated = strings.TrimRight(string(cut), " \t") + "…"
+		truncated = strings.TrimRightFunc(string(cut), unicode.IsSpace) + "…"
 	}
 	return strings.ReplaceAll(truncated, "`", "'")
 }
