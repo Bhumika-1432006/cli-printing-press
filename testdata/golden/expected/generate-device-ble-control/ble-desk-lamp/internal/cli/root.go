@@ -73,6 +73,33 @@ func newRootCmd(flags *rootFlags) *cobra.Command {
 		SilenceUsage: true,
 	}
 	rootCmd.SetVersionTemplate("ble-desk-lamp-pp-cli {{ .Version }}\n")
+	rootCmd.SetUsageTemplate(`Usage:{{if .Runnable}}
+  {{ .UseLine }}{{end}}{{if .HasAvailableSubCommands}}
+  {{ .CommandPath }} [command]{{end}}{{if gt (len .Aliases) 0}}
+
+Aliases:
+  {{ .NameAndAliases }}{{end}}{{if .HasExample}}
+
+Examples:
+{{ .Example }}{{end}}{{if .HasAvailableSubCommands}}
+
+Available Commands:{{range .Commands}}{{if (or .IsAvailableCommand (eq .Name "help"))}}
+  {{rpad .Name .NamePadding }} {{ .Short }}{{end}}{{end}}{{end}}{{if .HasAvailableLocalFlags}}
+
+Flags:
+{{ .LocalFlags.FlagUsages | trimRightSpace }}{{end}}{{if .HasAvailableInheritedFlags}}{{if .HasParent}}
+
+Global flags: run '{{ .Root.Name }} --help' to see all global flags.{{else}}
+
+Global Flags:
+{{ .InheritedFlags.FlagUsages | trimRightSpace }}{{end}}{{end}}{{if .HasHelpSubCommands}}
+
+Additional help topics:{{range .Commands}}{{if .IsAdditionalHelpTopicCommand}}
+  {{rpad .Name .NamePadding}} {{ .Short }}{{end}}{{end}}{{end}}{{if .HasAvailableSubCommands}}
+
+Use "{{ .CommandPath }} [command] --help" for more information about a command.{{end}}
+`)
+
 	rootCmd.PersistentFlags().BoolVar(&flags.asJSON, "json", false, "Output as JSON")
 	rootCmd.PersistentFlags().BoolVar(&flags.asJSON, "agent", false, "Output agent-friendly JSON")
 	rootCmd.PersistentFlags().BoolVar(&flags.live, "live", false, "Contact the physical device over BLE (needs a binary built with -tags ble_live)")
