@@ -77,6 +77,12 @@ var bareHostFileExt = map[string]bool{
 	"xml": true, "yaml": true, "yml": true,
 }
 
+// specialUseHostTLD lists registry-reserved labels the public suffix list does
+// not mark as ICANN. Documentation hosts such as api.vendor.example still count.
+var specialUseHostTLD = map[string]bool{
+	"example": true, "invalid": true, "localhost": true, "test": true,
+}
+
 var documentedURLListNames = map[string]bool{
 	"observed-urls.txt":             true,
 	"documented-urls.txt":           true,
@@ -562,39 +568,22 @@ func bareHostname(raw string) string {
 		return ""
 	}
 	last := host[strings.LastIndex(host, ".")+1:]
-	if bareHostFileExt[last] {
-		return ""
-	}
-	// Reject file-extension-shaped or version-number-shaped suffixes: the TLD
-	// must contain at least one letter (real TLDs are alphabetic; pure-digit
-	// suffixes like ".0" or ".1" are version components, not hostnames).
-	hasLetter := false
-	for _, c := range last {
-		if c >= 'a' && c <= 'z' {
-			hasLetter = true
-			break
-		}
-	}
-	if !hasLetter {
-		return ""
-	}
-	// Reject dotted-decimal IP-like strings (all labels numeric).
-	allNumeric := true
-	for _, label := range strings.Split(host, ".") {
-		for _, c := range label {
-			if c < '0' || c > '9' {
-				allNumeric = false
-				break
-			}
-		}
-		if !allNumeric {
-			break
-		}
-	}
-	if allNumeric {
+	// Extensions win even when the label is also a delegated TLD (md).
+	if bareHostFileExt[last] || !isHostTLD(last) {
 		return ""
 	}
 	return normalizeNovelHost(host)
+}
+
+// The final label is checked on its own so a private-suffix host
+// (www.googleapis.com) still counts while a dotted identifier
+// (tables.create, VM.Audit) does not.
+func isHostTLD(label string) bool {
+	if specialUseHostTLD[label] {
+		return true
+	}
+	suffix, icann := publicsuffix.PublicSuffix(label)
+	return icann && suffix == label
 }
 
 func normalizeNovelHost(host string) string {
