@@ -173,8 +173,8 @@ func newRendersSubmitCmd(flags *rootFlags) *cobra.Command {
 				}
 				if flags.dryRun {
 					envelope["dry_run"] = true
-					envelope["status"] = 0
-					envelope["success"] = false
+					delete(envelope, "status")
+					envelope["success"] = true
 				}
 				// Verify-mode synthetic envelope detection runs against RAW data
 				// (before --compact/--select filtering) so the sentinel field is
@@ -188,7 +188,7 @@ func newRendersSubmitCmd(flags *rootFlags) *cobra.Command {
 						if m, ok := rawParsed.(map[string]any); ok {
 							if v, ok := m["__pp_verify_synthetic__"].(bool); ok && v {
 								envelope["verify_noop"] = true
-								envelope["success"] = false
+								envelope["success"] = true
 							}
 						}
 					}

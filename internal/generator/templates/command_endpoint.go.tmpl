@@ -1053,8 +1053,8 @@ func new{{cmdIdent .FuncPrefix .EndpointName}}Cmd(flags *rootFlags) *cobra.Comma
 				}
 				if flags.dryRun {
 					envelope["dry_run"] = true
-					envelope["status"] = 0
-					envelope["success"] = false
+					delete(envelope, "status")
+					envelope["success"] = true
 				}
 				// Verify-mode synthetic envelope detection runs against RAW data
 				// (before --compact/--select filtering) so the sentinel field is
