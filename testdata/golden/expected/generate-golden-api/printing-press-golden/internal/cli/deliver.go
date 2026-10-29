@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -210,7 +211,16 @@ func deliverWebhook(url string, body []byte, compact bool) error {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 300 && resp.StatusCode < 400 {
-		return fmt.Errorf("webhook returned %s (Location: %q); redirects are not followed", resp.Status, resp.Header.Get("Location"))
+		loc := resp.Header.Get("Location")
+		var locDisplay string
+		if loc == "" {
+			locDisplay = `""`
+		} else if u, err := url.Parse(loc); err == nil && u.Host != "" {
+			locDisplay = fmt.Sprintf("%q", u.Scheme+"://"+u.Host)
+		} else {
+			locDisplay = `"(redacted)"`
+		}
+		return fmt.Errorf("webhook returned %s (Location: %s); redirects are not followed", resp.Status, locDisplay)
 	}
 	if resp.StatusCode >= 400 {
 		return fmt.Errorf("webhook returned %s", resp.Status)
