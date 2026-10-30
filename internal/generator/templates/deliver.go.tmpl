@@ -218,6 +218,12 @@ func deliverWebhook(webhookURL string, body []byte, compact bool) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	req = req.WithContext(ctx)
+	// Client.Do copies URL userinfo into Authorization before RoundTrip.
+	// Transport.RoundTrip does not, so do that copy here.
+	if user := req.URL.User; user != nil && req.Header.Get("Authorization") == "" {
+		password, _ := user.Password()
+		req.SetBasicAuth(user.Username(), password)
+	}
 	resp, err := http.DefaultTransport.RoundTrip(req)
 	if err != nil {
 		return fmt.Errorf("posting to webhook: %w", err)

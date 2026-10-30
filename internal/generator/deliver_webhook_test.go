@@ -19,6 +19,7 @@ func TestGeneratedDeliverWebhookRedactsRedirectLocation(t *testing.T) {
 	deliverGo := readGeneratedFile(t, outputDir, "internal", "cli", "deliver.go")
 	require.Contains(t, deliverGo, "func deliverWebhook(webhookURL string,")
 	require.Contains(t, deliverGo, "http.DefaultTransport.RoundTrip")
+	require.Contains(t, deliverGo, "req.SetBasicAuth(user.Username(), password)")
 	require.Contains(t, deliverGo, "url.Parse(loc)")
 	require.Contains(t, deliverGo, `u.Scheme != "" && u.Host != ""`)
 	require.NotContains(t, deliverGo, "http.ErrUseLastResponse")

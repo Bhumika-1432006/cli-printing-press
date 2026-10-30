@@ -5,6 +5,7 @@
 package cli
 
 import (
+	"encoding/base64"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -381,6 +382,23 @@ func TestDeliverWebhookRejectsUnvalidatedLocation(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestDeliverWebhookSendsURLUserinfoAsBasicAuth(t *testing.T) {
+	var gotAuth string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth = r.Header.Get("Authorization")
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	t.Cleanup(srv.Close)
+	endpoint := strings.Replace(srv.URL, "://", "://hookuser:s3cret-token@", 1)
+	if err := deliverWebhook(endpoint, []byte("{}"), false); err != nil {
+		t.Fatal(err)
+	}
+	want := "Basic " + base64.StdEncoding.EncodeToString([]byte("hookuser:s3cret-token"))
+	if gotAuth != want {
+		t.Fatalf("Authorization = %q, want %q", gotAuth, want)
 	}
 }
 
