@@ -6,6 +6,7 @@ package cli
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -190,10 +191,10 @@ func writeDownloadUnder(dir, name string, body []byte) error {
 	return nil
 }
 
-func deliverWebhook(url string, body []byte, compact bool) error {
+func deliverWebhook(webhookURL string, body []byte, compact bool) error {
 	_ = compact
 	contentType := "application/json"
-	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
+	req, err := http.NewRequest(http.MethodPost, webhookURL, bytes.NewReader(body))
 	if err != nil {
 		return fmt.Errorf("building webhook request: %w", err)
 	}
@@ -204,15 +205,12 @@ func deliverWebhook(url string, body []byte, compact bool) error {
 		req.Header.Set("User-Agent", "printing-press-golden-pp-cli/deliver")
 	}
 
-	// One POST. A followed 3xx would replay the body at a Location the
-	// operator did not name, including another host or an http downgrade.
-	httpClient := &http.Client{
-		Timeout: 30 * time.Second,
-		CheckRedirect: func(*http.Request, []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
-	}
-	resp, err := httpClient.Do(req)
+	// RoundTrip performs one POST and returns a 3xx as-is. Client.Do parses
+	// Location before ErrUseLastResponse and puts the raw header in that error.
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	req = req.WithContext(ctx)
+	resp, err := http.DefaultTransport.RoundTrip(req)
 	if err != nil {
 		return fmt.Errorf("posting to webhook: %w", err)
 	}
@@ -222,7 +220,7 @@ func deliverWebhook(url string, body []byte, compact bool) error {
 		var locDisplay string
 		if loc == "" {
 			locDisplay = `""`
-		} else if u, err := url.Parse(loc); err == nil && u.Host != "" {
+		} else if u, err := url.Parse(loc); err == nil && u.Scheme != "" && u.Host != "" {
 			locDisplay = fmt.Sprintf("%q", u.Scheme+"://"+u.Host)
 		} else {
 			locDisplay = `"(redacted)"`
